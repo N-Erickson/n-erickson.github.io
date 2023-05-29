@@ -1,0 +1,106 @@
+<html>
+	<head>
+		<title>My Stream Animated Panels</title>
+		<meta http-equiv="refresh" content="300">
+		<style>
+			@font-face {
+				font-family: 'Star 4 Radar';
+				src: url('fonts/Star 4 Radar.ttf');
+				}
+			#reminderContainer {
+				width: 0px;
+				height: 0px;
+				/*background: #063359;*/
+				position: absolute;
+				top: 0px;
+				left: 0px;
+				overflow: hidden;
+				color: white;
+				font-family: 'Star 4 Radar';
+				-webkit-box-shadow: 0px 0px 20px #FB8807;
+				-webkit-animation: animateReminder 300s 0s 1;
+				}
+
+			#reminderHeader {
+				width: 400px;
+				height: 26px;
+				background: #FB8807;
+				position: relative;
+				overflow: hidden;
+				text-align: center;
+				font-size: 24px;
+				}
+			#reminderContent {
+				width: 400px;
+				height: 900px;
+				background: #063359;
+				position: relative;
+				overflow: hidden;
+				color: white;
+				}
+
+			/*#twitchLogo {
+				width: 90px;
+				height: 90px;
+				float: left;
+				}*/
+				
+			@-webkit-keyframes animateReminder {
+				0%{
+					width: 400px;
+					height: 900px;
+					
+					}
+				1%{
+					width: 400px;
+					height: 900px;
+					}
+
+				2%{
+					width: 400px;
+					height: 900px;
+
+					}	
+				3%{
+					width: 400px;
+					height: 900px;
+
+					}	
+				100%{
+					width: 400px;
+					height: 900px;
+
+					}	
+				}
+		</style>		
+	</head>
+	<body>
+		<div id="reminderContainer">
+			<div id="reminderHeader">
+				<span>Local Sioux Falls Headlines</span>
+			</div>
+
+			<div id="reminderContent">
+				<! ––<image id="twitchLogo" src="images\twitchLogo.png">––
+				<div="reminderContentText">
+					<span>
+						<a class="twitter-timeline" href="https://twitter.com/SiouxWeather/lists/siouxfallsupdate?ref_src=twsrc%5Etfw" data-theme="dark" data-chrome="noheader, nofooter, transparent, noscrollbar" data-border-color="FB8807" data-tweet-limit="20" data-width="400" ></a>
+						<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+						<script type='text/javascript'>
+function ScrollDiv(){
+
+   if(document.getElementById('reminderContent').scrollTop<(document.getElementById('reminderContent').scrollHeight-document.getElementById('reminderContent').offsetHeight)){-1
+         document.getElementById('reminderContent').scrollTop=document.getElementById('reminderContent').scrollTop+1
+         }
+   else {document.getElementById('reminderContent').scrollTop=0;}
+}
+
+setInterval(ScrollDiv,50)
+</script>
+</body>
+					</span>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>
