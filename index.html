@@ -17,7 +17,7 @@
             left: 0;
             overflow: hidden;
             color: white;
-            font-family: 'Star 4 Radar';
+            font-family: Arial, sans-serif; /* Fallback font if Star 4 Radar isn't available */
             box-shadow: 0px 0px 20px #FB8807;
         }
         #reminderHeader {
@@ -27,6 +27,7 @@
             text-align: center;
             font-size: 24px;
             line-height: 26px;
+            font-family: 'Star 4 Radar', Arial, sans-serif;
         }
         #reminderContent {
             width: 100%;
@@ -39,30 +40,47 @@
             top: 0;
             left: 0;
             right: 0;
+            transition: transform 0.5s ease;
         }
         .newsItem {
             display: flex;
-            padding: 10px;
+            padding: 15px;
             border-bottom: 1px solid #FB8807;
+            background: rgba(251, 136, 7, 0.1);
+            margin-bottom: 5px;
         }
         .newsItem img {
             width: 80px;
             height: 80px;
-            margin-right: 10px;
+            margin-right: 15px;
             object-fit: cover;
+            border: 2px solid #FB8807;
+            border-radius: 4px;
         }
         .newsItem a {
             color: #FB8807;
             text-decoration: none;
             font-size: 16px;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 8px;
         }
         .newsItem a:hover {
             text-decoration: underline;
         }
         .newsSummary {
-            color: white;
+            color: #ffffff;
             font-size: 14px;
-            margin-top: 5px;
+            line-height: 1.4;
+        }
+        #errorMessage {
+            color: #FB8807;
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        .newsContent {
+            flex: 1;
         }
     </style>
 </head>
@@ -72,169 +90,132 @@
             <span>Local Sioux Falls Headlines</span>
         </div>
         <div id="reminderContent">
-            <div id="newsList">
-                <!-- News items will be injected here -->
-            </div>
+            <div id="errorMessage"></div>
+            <div id="newsList"></div>
         </div>
     </div>
 
     <script>
-        async function fetchNews() {
-            const rssUrl = 'https://rss.app/feeds/W1AjOMSbB8Uft2rC.xml';
+        const PROXY_URLS = [
+            'https://api.allorigins.win/raw?url=',
+            'https://cors-anywhere.herokuapp.com/',
+            'https://api.rss2json.com/v1/api.json?rss_url='
+        ];
 
+        async function tryFetchWithProxy(rssUrl, proxyUrl) {
             try {
-                // Attempt to fetch the RSS feed directly
-                const response = await fetch(rssUrl);
-                if (!response.ok) throw new Error('Network response was not ok');
-
+                const response = await fetch(proxyUrl + encodeURIComponent(rssUrl));
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.text();
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(data, "application/xml");
+                return data;
+            } catch (error) {
+                console.error(`Error with proxy ${proxyUrl}:`, error);
+                return null;
+            }
+        }
 
-                const parseError = xmlDoc.getElementsByTagName('parsererror');
-                if (parseError.length) {
-                    console.error('Error parsing XML:', parseError[0].textContent);
-                    return;
-                }
-
-                const items = xmlDoc.getElementsByTagName('item');
-                const newsList = document.getElementById('newsList');
-
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    const newsItem = document.createElement('div');
-                    newsItem.className = 'newsItem';
-
-                    // Extract title and link
-                    const titleElement = item.getElementsByTagName('title')[0];
-                    const linkElement = item.getElementsByTagName('link')[0];
-                    const title = titleElement ? titleElement.textContent : 'No Title';
-                    const link = linkElement ? linkElement.textContent : '#';
-
-                    // Extract description for summary
-                    const descriptionElement = item.getElementsByTagName('description')[0];
-                    let description = descriptionElement ? descriptionElement.textContent : '';
-
-                    // Extract image URL if available
-                    let imageUrl = 'https://via.placeholder.com/80'; // Default image
-                    const enclosure = item.getElementsByTagName('enclosure')[0];
-                    if (enclosure && enclosure.getAttribute('type').startsWith('image/')) {
-                        imageUrl = enclosure.getAttribute('url');
-                    } else {
-                        // Try to extract image from 'media:content'
-                        const mediaContent = item.getElementsByTagName('media:content')[0];
-                        if (mediaContent && mediaContent.getAttribute('url')) {
-                            imageUrl = mediaContent.getAttribute('url');
-                        } else {
-                            // Try to extract image from 'description' HTML
-                            const imgMatch = description.match(/<img[^>]+src="([^">]+)"/i);
-                            if (imgMatch && imgMatch[1]) {
-                                imageUrl = imgMatch[1];
-                            }
+        async function fetchNews() {
+            const rssUrl = 'https://news.google.com/rss/search?q=location:Sioux+Falls+when:7d&hl=en-US&gl=US&ceid=US:en';
+            const newsList = document.getElementById('newsList');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            let success = false;
+            
+            for (const proxyUrl of PROXY_URLS) {
+                const data = await tryFetchWithProxy(rssUrl, proxyUrl);
+                if (data) {
+                    try {
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(data, "text/xml");
+                        
+                        if (!xmlDoc.getElementsByTagName('parsererror').length) {
+                            await processNewsItems(xmlDoc);
+                            success = true;
+                            break;
                         }
+                    } catch (error) {
+                        console.error('Error processing XML:', error);
                     }
-
-                    // Remove image tags from description
-                    description = description.replace(/<img[^>]*>/g, '');
-
-                    // Strip HTML tags from description
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = description;
-                    description = tempDiv.textContent || tempDiv.innerText || '';
-
-                    // Limit description length
-                    description = description.trim().substring(0, 150) + '...';
-
-                    // Create image element
-                    const img = document.createElement('img');
-                    img.src = imageUrl;
-                    img.onerror = function() {
-                        this.src = 'https://via.placeholder.com/80'; // Fallback image
-                    };
-
-                    // Create content div
-                    const contentDiv = document.createElement('div');
-
-                    // Create title element
-                    const titleDiv = document.createElement('div');
-                    titleDiv.innerHTML = `<a href="${link}" target="_blank">${title}</a>`;
-
-                    // Create summary element
-                    const summaryDiv = document.createElement('div');
-                    summaryDiv.className = 'newsSummary';
-                    summaryDiv.textContent = description;
-
-                    // Append elements
-                    contentDiv.appendChild(titleDiv);
-                    contentDiv.appendChild(summaryDiv);
-
-                    newsItem.appendChild(img);
-                    newsItem.appendChild(contentDiv);
-                    newsList.appendChild(newsItem);
                 }
+            }
 
-                // Start scrolling after content is loaded
+            if (!success) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = 'Unable to load news. Please try again later.';
+            } else {
+                errorMessage.style.display = 'none';
                 startScrolling();
-
-            } catch (error) {
-                console.error('Error fetching the news:', error);
-                // If direct fetch fails due to CORS, try using a proxy
-                fetchNewsWithProxy();
             }
         }
 
-        async function fetchNewsWithProxy() {
-            const rssUrl = 'https://news.google.com/topics/CAAqIggKIhxDQkFTRHdvSkwyMHZNREV6YkRac0VnSmxiaWdBUAE?ceid=US:en&oc=3';
-            const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(rssUrl);
+        async function processNewsItems(xmlDoc) {
+            const items = xmlDoc.getElementsByTagName('item');
+            const newsList = document.getElementById('newsList');
+            newsList.innerHTML = ''; // Clear existing items
 
-            try {
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error('Network response was not ok');
+            for (let i = 0; i < Math.min(items.length, 10); i++) {
+                const item = items[i];
+                const newsItem = document.createElement('div');
+                newsItem.className = 'newsItem';
 
-                const data = await response.json();
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(data.contents, "application/xml");
+                const title = item.getElementsByTagName('title')[0]?.textContent || 'No Title';
+                const link = item.getElementsByTagName('link')[0]?.textContent || '#';
+                let description = item.getElementsByTagName('description')[0]?.textContent || '';
 
-                const parseError = xmlDoc.getElementsByTagName('parsererror');
-                if (parseError.length) {
-                    console.error('Error parsing XML:', parseError[0].textContent);
-                    return;
-                }
+                // Clean up description
+                description = description.replace(/<[^>]*>/g, '');
+                description = description.trim().substring(0, 150) + '...';
 
-                const items = xmlDoc.getElementsByTagName('item');
-                const newsList = document.getElementById('newsList');
+                // Create image with fallback
+                const img = document.createElement('img');
+                img.src = 'https://via.placeholder.com/80/FB8807/FFFFFF?text=SF+News';
+                img.onerror = () => img.src = 'https://via.placeholder.com/80/FB8807/FFFFFF?text=SF+News';
 
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    const newsItem = document.createElement('div');
-                    newsItem.className = 'newsItem';
+                // Create content wrapper
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'newsContent';
 
-                }
+                // Add title and description
+                contentDiv.innerHTML = `
+                    <a href="${link}" target="_blank">${title}</a>
+                    <div class="newsSummary">${description}</div>
+                `;
 
-                // Start scrolling after content is loaded
-                startScrolling();
-
-            } catch (error) {
-                console.error('Error fetching the news with proxy:', error);
+                newsItem.appendChild(img);
+                newsItem.appendChild(contentDiv);
+                newsList.appendChild(newsItem);
             }
         }
 
-        // Function to implement scrolling effect
         function startScrolling() {
             const newsList = document.getElementById('newsList');
+            const container = document.getElementById('reminderContent');
             let scrollPosition = 0;
+            const scrollSpeed = 1;
+            let isPaused = false;
+
+            // Add pause on hover
+            container.addEventListener('mouseenter', () => isPaused = true);
+            container.addEventListener('mouseleave', () => isPaused = false);
 
             setInterval(() => {
-                scrollPosition += 1;
-                if (scrollPosition >= newsList.scrollHeight - newsList.parentElement.clientHeight) {
-                    scrollPosition = 0;
+                if (!isPaused) {
+                    scrollPosition += scrollSpeed;
+                    const maxScroll = newsList.scrollHeight - container.clientHeight;
+                    
+                    if (scrollPosition >= maxScroll) {
+                        // Smooth reset to top
+                        scrollPosition = 0;
+                    }
+                    
+                    newsList.style.transform = `translateY(-${scrollPosition}px)`;
                 }
-                newsList.style.transform = `translateY(-${scrollPosition}px)`;
             }, 50);
         }
 
-        // Fetch news on page load
+        // Initial fetch and refresh every 5 minutes
         fetchNews();
+        setInterval(fetchNews, 300000);
     </script>
 </body>
 </html>
