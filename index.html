@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Local Sioux Falls Headlines</title>
+    <meta http-equiv="refresh" content="300">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        #reminderContainer {
+            width: 400px;
+            height: 900px;
+            background: #063359;
+            position: absolute;
+            top: 0;
+            left: 0;
+            overflow: hidden;
+            color: white;
+            font-family: Arial, sans-serif;
+            box-shadow: 0px 0px 20px #FB8807;
+        }
+        #reminderHeader {
+            width: 100%;
+            height: 26px;
+            background: #FB8807;
+            text-align: center;
+            font-size: 24px;
+            line-height: 26px;
+            font-weight: bold;
+        }
+        #reminderContent {
+            width: 100%;
+            height: calc(100% - 26px);
+            overflow: hidden;
+            position: relative;
+        }
+        #newsList {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            transition: transform 0.5s ease;
+        }
+        .newsItem {
+            display: flex;
+            padding: 15px;
+            border-bottom: 1px solid #FB8807;
+            background: rgba(251, 136, 7, 0.1);
+            margin-bottom: 5px;
+        }
+        .icon-thumbnail {
+            width: 80px;
+            height: 80px;
+            margin-right: 15px;
+            border: 2px solid #FB8807;
+            border-radius: 8px;
+            background: #0d4270;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        .icon-thumbnail:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        .icon-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .icon-thumbnail i {
+            font-size: 32px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            z-index: 2;
+        }
+        .icon-thumbnail .background-icon {
+            position: absolute;
+            font-size: 64px;
+            opacity: 0.1;
+            transform: rotate(-15deg);
+            right: -10px;
+            bottom: -10px;
+        }
+        .icon-thumbnail .category-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.4);
+            font-size: 10px;
+            padding: 2px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .newsItem a {
+            color: #FB8807;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .newsItem a:hover {
+            text-decoration: underline;
+        }
+        .newsSummary {
+            color: #ffffff;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        #errorMessage {
+            color: #FB8807;
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        .newsContent {
+            flex: 1;
+        }
+        .source-thumbnail {
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            background: linear-gradient(135deg, #FB8807, #FFB74D);
+        }
+        .source-label {
+            font-size: 12px;
+            color: #FB8807;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div id="reminderContainer">
+        <div id="reminderHeader">
+            <span>Local Sioux Falls Headlines</span>
+        </div>
+        <div id="reminderContent">
+            <div id="errorMessage"></div>
+            <div id="newsList"></div>
+        </div>
+    </div>
+
+    <script>
+const NEWS_CATEGORIES = {
+            weather: {
+                keywords: ['weather', 'storm', 'forecast', 'temperature', 'snow', 'rain', 'climate'],
+                mainIcon: 'fa-cloud-sun',
+                bgIcon: 'fa-wind',
+                icons: ['fa-cloud-sun', 'fa-cloud-rain', 'fa-snowflake', 'fa-bolt', 'fa-temperature-high', 'fa-sun']
+            },
+            sports: {
+                keywords: ['sports', 'football', 'basketball', 'baseball', 'tournament', 'game', 'score'],
+                mainIcon: 'fa-trophy',
+                bgIcon: 'fa-running',
+                icons: ['fa-football', 'fa-basketball', 'fa-baseball-ball', 'fa-hockey-puck', 'fa-medal', 'fa-trophy']
+            },
+            business: {
+                keywords: ['business', 'economy', 'market', 'company', 'store', 'restaurant', 'financial'],
+                mainIcon: 'fa-chart-line',
+                bgIcon: 'fa-dollar-sign',
+                icons: ['fa-chart-line', 'fa-building', 'fa-briefcase', 'fa-store', 'fa-coins', 'fa-money-bill']
+            },
+            politics: {
+                keywords: ['government', 'mayor', 'council', 'vote', 'election', 'policy', 'senator'],
+                mainIcon: 'fa-landmark',
+                bgIcon: 'fa-flag-usa',
+                icons: ['fa-landmark', 'fa-gavel', 'fa-scale-balanced', 'fa-flag', 'fa-handshake', 'fa-scroll']
+            },
+            crime: {
+                keywords: ['police', 'crime', 'arrest', 'investigation', 'court', 'law', 'sheriff'],
+                mainIcon: 'fa-shield',
+                bgIcon: 'fa-balance-scale',
+                icons: ['fa-shield', 'fa-user-shield', 'fa-gavel', 'fa-bell', 'fa-exclamation-triangle']
+            },
+            community: {
+                keywords: ['community', 'event', 'festival', 'parade', 'celebration', 'local'],
+                mainIcon: 'fa-users',
+                bgIcon: 'fa-heart',
+                icons: ['fa-users', 'fa-hands-helping', 'fa-home', 'fa-star', 'fa-heart', 'fa-tree']
+            }
+        };
+
+        const LOCAL_NEWS_SOURCES = [
+            {
+                name: 'KELOLAND',
+                urls: [
+                    'https://www.keloland.com/feed/',
+                    'https://www.keloland.com/news/local-news/feed/'
+                ],
+                shortName: 'KELO',
+                icon: 'fa-tv'
+            },
+            {
+                name: 'Dakota News Now',
+                urls: [
+                    'https://www.dakotanewsnow.com/feed/',
+                    'https://www.dakotanewsnow.com/news/feed/'
+                ],
+                shortName: 'DAKOTA',
+                icon: 'fa-broadcast-tower'
+            },
+            {
+                name: 'Sioux Falls Live',
+                urls: ['https://www.siouxfallslive.com/index.rss'],
+                shortName: 'SFL',
+                icon: 'fa-newspaper'
+            },
+            {
+                name: 'SD News Watch',
+                urls: ['https://www.sdnewswatch.org/rss/'],
+                shortName: 'SDNW',
+                icon: 'fa-binoculars'
+            },
+            {
+                name: 'Downtown SF',
+                urls: ['https://dtsf.com/blog/feed/'],
+                shortName: 'DTSF',
+                icon: 'fa-city'
+            },
+            {
+                name: 'SF Simplified',
+                urls: ['https://www.sfsimplified.com/rss/'],
+                shortName: 'SFS',
+                icon: 'fa-file-alt'
+            }
+        ];
+
+        function getColorSchemeForCategory(category) {
+            const schemes = {
+                weather: ['87CEEB', '4682B4', '1E90FF'],
+                sports: ['FF6B6B', 'FF8E8E', 'FFB4B4'],
+                business: ['4CAF50', '66BB6A', '81C784'],
+                politics: ['9C27B0', 'BA68C8', 'CE93D8'],
+                crime: ['F44336', 'EF5350', 'E57373'],
+                community: ['FF9800', 'FFA726', 'FFB74D']
+            };
+            return schemes[category] || ['FB8807', 'FFA647', 'FFC487'];
+        }
+
+        function getNewsCategory(title, description) {
+            const content = (title + ' ' + description).toLowerCase();
+            for (const [category, data] of Object.entries(NEWS_CATEGORIES)) {
+                if (data.keywords.some(keyword => content.includes(keyword))) {
+                    return category;
+                }
+            }
+            return 'general';
+        }
+
+        function findThumbnail(item) {
+            // Try to find image in media:content
+            const mediaContent = item.getElementsByTagName('media:content')[0];
+            if (mediaContent && mediaContent.getAttribute('url')) {
+                return mediaContent.getAttribute('url');
+            }
+
+            // Try to find image in enclosure
+            const enclosure = item.getElementsByTagName('enclosure')[0];
+            if (enclosure && enclosure.getAttribute('url') && enclosure.getAttribute('type')?.startsWith('image/')) {
+                return enclosure.getAttribute('url');
+            }
+
+            // Try to find image in description
+            const description = item.getElementsByTagName('description')[0]?.textContent || '';
+            const imgMatch = description.match(/<img[^>]+src="([^">]+)"/);
+            if (imgMatch) {
+                return imgMatch[1];
+            }
+
+            return null;
+        }
+
+        function createThumbnail(title, description, link, imageUrl, source) {
+            const div = document.createElement('div');
+            div.className = 'icon-thumbnail';
+            
+            if (imageUrl) {
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.alt = title;
+                img.onerror = function() {
+                    // If image fails to load, fallback to source icon
+                    div.innerHTML = '';
+                    div.classList.add('source-thumbnail');
+                    const icon = document.createElement('i');
+                    icon.className = `fas ${source.icon}`;
+                    div.appendChild(icon);
+                    const label = document.createElement('div');
+                    label.className = 'category-label';
+                    label.textContent = source.shortName;
+                    div.appendChild(label);
+                };
+                div.appendChild(img);
+            } else {
+                div.classList.add('source-thumbnail');
+                const icon = document.createElement('i');
+                icon.className = `fas ${source.icon}`;
+                div.appendChild(icon);
+                const label = document.createElement('div');
+                label.className = 'category-label';
+                label.textContent = source.shortName;
+                div.appendChild(label);
+            }
+            
+            return div;
+        }
+
+        async function fetchNews() {
+            const newsList = document.getElementById('newsList');
+            const errorMessage = document.getElementById('errorMessage');
+            let allNews = [];
+            
+            for (const source of LOCAL_NEWS_SOURCES) {
+                for (const url of source.urls) {
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) continue;
+                        
+                        const data = await response.text();
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(data, "text/xml");
+                        
+                        if (xmlDoc.getElementsByTagName('parsererror').length) continue;
+                        
+                        const items = xmlDoc.getElementsByTagName('item');
+                        for (let i = 0; i < Math.min(items.length, 5); i++) {
+                            const item = items[i];
+                            const imageUrl = findThumbnail(item);
+                            const pubDate = new Date(item.getElementsByTagName('pubDate')[0]?.textContent || Date.now());
+                            
+                            allNews.push({
+                                title: item.getElementsByTagName('title')[0]?.textContent || 'No Title',
+                                link: item.getElementsByTagName('link')[0]?.textContent || '#',
+                                description: (item.getElementsByTagName('description')[0]?.textContent || '')
+                                    .replace(/<[^>]*>/g, '')
+                                    .trim()
+                                    .substring(0, 150) + '...',
+                                imageUrl: imageUrl,
+                                source: source,
+                                pubDate: pubDate
+                            });
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching from ${source.name}:`, error);
+                    }
+                }
+            }
+            
+            if (allNews.length === 0) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = 'Unable to load news. Please try again later.';
+                return;
+            }
+            
+            // Sort by newest first
+            allNews.sort((a, b) => b.pubDate - a.pubDate);
+            // Limit to 10 items
+            allNews = allNews.slice(0, 10);
+            
+            newsList.innerHTML = '';
+            allNews.forEach(item => {
+                const thumbnail = createThumbnail(item.title, item.description, item.link, item.imageUrl, item.source);
+                
+                const newsItem = document.createElement('div');
+                newsItem.className = 'newsItem';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'newsContent';
+                
+                contentDiv.innerHTML = `
+                    <a href="${item.link}" target="_blank">${item.title}</a>
+                    <div class="newsSummary">${item.description}</div>
+                    <div class="source-label">${item.source.name}</div>
+                `;
+                
+                newsItem.appendChild(thumbnail);
+                newsItem.appendChild(contentDiv);
+                newsList.appendChild(newsItem);
+            });
+            
+            errorMessage.style.display = 'none';
+            startScrolling();
+        }
+
+        function startScrolling() {
+            const newsList = document.getElementById('newsList');
+            const container = document.getElementById('reminderContent');
+            let scrollPosition = 0;
+            const scrollSpeed = 1;
+            let isPaused = false;
+
+            container.addEventListener('mouseenter', () => isPaused = true);
+            container.addEventListener('mouseleave', () => isPaused = false);
+
+            setInterval(() => {
+                if (!isPaused) {
+                    scrollPosition += scrollSpeed;
+                    const maxScroll = newsList.scrollHeight - container.clientHeight;
+                    
+                    if (scrollPosition >= maxScroll) {
+                        scrollPosition = 0;
+                    }
+                    
+                    newsList.style.transform = `translateY(-${scrollPosition}px)`;
+                }
+            }, 50);
+        }
+
+        // Initial fetch and refresh every 5 minutes
+        fetchNews();
+        setInterval(fetchNews, 300000);
+    </script>
+</body>
+</html>
