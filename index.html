@@ -131,6 +131,12 @@
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
             background: linear-gradient(135deg, #FB8807, #FFB74D);
         }
+        .newsDate {
+            color: #FB8807;
+            font-size: 12px;
+            margin-top: 5px;
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -354,21 +360,28 @@
         }
 
         async function processNewsItems(xmlDoc) {
-            const items = xmlDoc.getElementsByTagName('item');
+            const items = Array.from(xmlDoc.getElementsByTagName('item'));
             const newsList = document.getElementById('newsList');
             newsList.innerHTML = '';
+
+            // Sort items by pubDate
+            items.sort((a, b) => {
+                const dateA = new Date(a.getElementsByTagName('pubDate')[0]?.textContent);
+                const dateB = new Date(b.getElementsByTagName('pubDate')[0]?.textContent);
+                return dateB - dateA; // Most recent first
+            });
 
             for (let i = 0; i < Math.min(items.length, 50); i++) {
                 const item = items[i];
                 const title = item.getElementsByTagName('title')[0]?.textContent || 'No Title';
                 const link = item.getElementsByTagName('link')[0]?.textContent || '#';
                 let description = item.getElementsByTagName('description')[0]?.textContent || '';
+                const pubDate = new Date(item.getElementsByTagName('pubDate')[0]?.textContent);
 
                 description = description.replace(/<[^>]*>/g, '');
                 description = description.trim().substring(0, 150) + '...';
 
                 const thumbnail = createThumbnail(title, description, link);
-
                 const newsItem = document.createElement('div');
                 newsItem.className = 'newsItem';
 
@@ -378,6 +391,7 @@
                 contentDiv.innerHTML = `
                     <a href="${link}" target="_blank">${title}</a>
                     <div class="newsSummary">${description}</div>
+                    <div class="newsDate">${pubDate.toLocaleString()}</div>
                 `;
 
                 newsItem.appendChild(thumbnail);
@@ -387,7 +401,7 @@
         }
 
         async function fetchNews() {
-            const rssUrl = 'https://news.google.com/rss/search?q=location:Sioux+Falls+when:7d&hl=en-US&gl=US&ceid=US:en';
+            const rssUrl = 'https://news.google.com/rss/search?q=location:Sioux+Falls+when:2d&hl=en-US&gl=US&ceid=US:en';
             const errorMessage = document.getElementById('errorMessage');
             
             let success = false;
@@ -428,7 +442,6 @@
                 startScrolling();
             }
 
-            // Reset failed proxies list periodically
             setTimeout(() => {
                 failedProxies.clear();
             }, 300000);
@@ -438,7 +451,7 @@
             const newsList = document.getElementById('newsList');
             const container = document.getElementById('reminderContent');
             let scrollPosition = 0;
-            const scrollSpeed = 1;
+            const scrollSpeed = 0.5; // Slower scrolling speed
             let isPaused = false;
 
             container.addEventListener('mouseenter', () => isPaused = true);
