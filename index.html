@@ -3,6 +3,7 @@
 <head>
     <title>Local Sioux Falls Headlines</title>
     <meta http-equiv="refresh" content="300">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         @font-face {
             font-family: 'Star 4 Radar';
@@ -53,14 +54,50 @@
             background: rgba(251, 136, 7, 0.1);
             margin-bottom: 5px;
         }
-        .newsItem img {
+        .icon-thumbnail {
             width: 80px;
             height: 80px;
             margin-right: 15px;
-            object-fit: cover;
             border: 2px solid #FB8807;
-            border-radius: 4px;
+            border-radius: 8px;
             background: #0d4270;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        .icon-thumbnail:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        .icon-thumbnail i {
+            font-size: 32px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            z-index: 2;
+        }
+        .icon-thumbnail .background-icon {
+            position: absolute;
+            font-size: 64px;
+            opacity: 0.1;
+            transform: rotate(-15deg);
+            right: -10px;
+            bottom: -10px;
+        }
+        .icon-thumbnail .category-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.4);
+            font-size: 10px;
+            padding: 2px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         .newsItem a {
             color: #FB8807;
@@ -87,6 +124,13 @@
         .newsContent {
             flex: 1;
         }
+        .source-thumbnail {
+            font-family: 'Star 4 Radar', Arial, sans-serif;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            background: linear-gradient(135deg, #FB8807, #FFB74D);
+        }
     </style>
 </head>
 <body>
@@ -108,106 +152,133 @@
         ];
 
         const NEWS_CATEGORIES = {
-            weather: ['weather', 'storm', 'forecast', 'temperature', 'snow', 'rain', 'climate'],
-            sports: ['sports', 'football', 'basketball', 'baseball', 'tournament', 'game', 'score', 'team', 'playoff'],
-            business: ['business', 'economy', 'market', 'company', 'store', 'restaurant', 'financial', 'money', 'bank'],
-            politics: ['government', 'mayor', 'council', 'vote', 'election', 'policy', 'senator', 'republican', 'democrat'],
-            crime: ['police', 'crime', 'arrest', 'investigation', 'court', 'law', 'sheriff', 'robbery', 'suspect'],
-            community: ['community', 'event', 'festival', 'parade', 'celebration', 'school', 'local', 'neighborhood'],
-            entertainment: ['movie', 'concert', 'music', 'theater', 'show', 'performance', 'art', 'museum'],
-            health: ['health', 'medical', 'hospital', 'doctor', 'clinic', 'virus', 'disease', 'treatment'],
-            education: ['education', 'school', 'university', 'student', 'teacher', 'class', 'academic'],
-            development: ['construction', 'building', 'development', 'project', 'property', 'real estate']
+            weather: {
+                keywords: ['weather', 'storm', 'forecast', 'temperature', 'snow', 'rain', 'climate'],
+                mainIcon: 'fa-cloud-sun',
+                bgIcon: 'fa-wind',
+                icons: ['fa-cloud-sun', 'fa-cloud-rain', 'fa-snowflake', 'fa-bolt', 'fa-temperature-high', 'fa-sun']
+            },
+            sports: {
+                keywords: ['sports', 'football', 'basketball', 'baseball', 'tournament', 'game', 'score'],
+                mainIcon: 'fa-trophy',
+                bgIcon: 'fa-running',
+                icons: ['fa-football', 'fa-basketball', 'fa-baseball-ball', 'fa-hockey-puck', 'fa-medal', 'fa-trophy']
+            },
+            business: {
+                keywords: ['business', 'economy', 'market', 'company', 'store', 'restaurant', 'financial'],
+                mainIcon: 'fa-chart-line',
+                bgIcon: 'fa-dollar-sign',
+                icons: ['fa-chart-line', 'fa-building', 'fa-briefcase', 'fa-store', 'fa-coins', 'fa-money-bill']
+            },
+            politics: {
+                keywords: ['government', 'mayor', 'council', 'vote', 'election', 'policy', 'senator'],
+                mainIcon: 'fa-landmark',
+                bgIcon: 'fa-flag-usa',
+                icons: ['fa-landmark', 'fa-gavel', 'fa-scale-balanced', 'fa-flag', 'fa-handshake', 'fa-scroll']
+            },
+            crime: {
+                keywords: ['police', 'crime', 'arrest', 'investigation', 'court', 'law', 'sheriff'],
+                mainIcon: 'fa-shield',
+                bgIcon: 'fa-balance-scale',
+                icons: ['fa-shield', 'fa-user-shield', 'fa-gavel', 'fa-bell', 'fa-exclamation-triangle']
+            },
+            community: {
+                keywords: ['community', 'event', 'festival', 'parade', 'celebration', 'local'],
+                mainIcon: 'fa-users',
+                bgIcon: 'fa-heart',
+                icons: ['fa-users', 'fa-hands-helping', 'fa-home', 'fa-star', 'fa-heart', 'fa-tree']
+            }
         };
 
         const LOCAL_NEWS_SOURCES = [
             {
                 name: 'KELO',
-                shortName: 'KELO'
+                shortName: 'KELO',
+                icon: 'fa-tv'
             },
             {
                 name: 'Argus Leader',
-                shortName: 'ARGUS'
+                shortName: 'ARGUS',
+                icon: 'fa-newspaper'
             },
             {
                 name: 'Dakota News',
-                shortName: 'DAKOTA'
+                shortName: 'DAKOTA',
+                icon: 'fa-radio'
             },
             {
                 name: 'KSFY',
-                shortName: 'KSFY'
+                shortName: 'KSFY',
+                icon: 'fa-broadcast-tower'
             }
         ];
 
         function getColorSchemeForCategory(category) {
             const schemes = {
-                weather: ['87CEEB', '4682B4', '1E90FF'],      // Sky blues
-                sports: ['FF6B6B', 'FF8E8E', 'FFB4B4'],       // Energetic reds
-                business: ['4CAF50', '66BB6A', '81C784'],     // Professional greens
-                politics: ['9C27B0', 'BA68C8', 'CE93D8'],     // Royal purples
-                crime: ['F44336', 'EF5350', 'E57373'],        // Alert reds
-                community: ['FF9800', 'FFA726', 'FFB74D'],    // Warm oranges
-                entertainment: ['E91E63', 'EC407A', 'F06292'], // Vibrant pinks
-                health: ['00BCD4', '26C6DA', '4DD0E1'],       // Medical blues
-                education: ['3F51B5', '5C6BC0', '7986CB'],    // Academic blues
-                development: ['795548', '8D6E63', 'A1887F']   // Earth browns
+                weather: ['87CEEB', '4682B4', '1E90FF'],
+                sports: ['FF6B6B', 'FF8E8E', 'FFB4B4'],
+                business: ['4CAF50', '66BB6A', '81C784'],
+                politics: ['9C27B0', 'BA68C8', 'CE93D8'],
+                crime: ['F44336', 'EF5350', 'E57373'],
+                community: ['FF9800', 'FFA726', 'FFB74D']
             };
-            
-            return schemes[category] || ['FB8807', 'FFA647', 'FFC487']; // Default orange scheme
-        }
-
-        function getRandomWord(text, minLength = 4) {
-            const words = text.split(' ')
-                .filter(word => word.length >= minLength)
-                .filter(word => !word.toLowerCase().includes('sioux') && !word.toLowerCase().includes('falls'));
-            return words[Math.floor(Math.random() * words.length)] || 'SF';
+            return schemes[category] || ['FB8807', 'FFA647', 'FFC487'];
         }
 
         function getNewsCategory(title, description) {
             const content = (title + ' ' + description).toLowerCase();
-            for (const [category, keywords] of Object.entries(NEWS_CATEGORIES)) {
-                if (keywords.some(keyword => content.includes(keyword))) {
+            for (const [category, data] of Object.entries(NEWS_CATEGORIES)) {
+                if (data.keywords.some(keyword => content.includes(keyword))) {
                     return category;
                 }
             }
             return 'general';
         }
 
-        function getImageForNews(title, description, link) {
-            // Try to match to a local news source first
+        function createThumbnail(title, description, link) {
             const sourceMatch = LOCAL_NEWS_SOURCES.find(source => 
                 link.toLowerCase().includes(source.name.toLowerCase())
             );
             
+            const div = document.createElement('div');
+            div.className = 'icon-thumbnail';
+            
             if (sourceMatch) {
-                return `https://via.placeholder.com/80/FB8807/FFFFFF?text=${encodeURIComponent(sourceMatch.shortName)}`;
+                div.classList.add('source-thumbnail');
+                const icon = document.createElement('i');
+                icon.className = `fas ${sourceMatch.icon}`;
+                div.appendChild(icon);
+                const label = document.createElement('div');
+                label.className = 'category-label';
+                label.textContent = sourceMatch.shortName;
+                div.appendChild(label);
+            } else {
+                const category = getNewsCategory(title, description);
+                const categoryData = NEWS_CATEGORIES[category] || {
+                    mainIcon: 'fa-newspaper',
+                    bgIcon: 'fa-circle',
+                    icons: ['fa-newspaper']
+                };
+                
+                const colors = getColorSchemeForCategory(category);
+                const mainColor = colors[Math.floor(Math.random() * colors.length)];
+                div.style.backgroundColor = `#${mainColor}`;
+
+                const mainIcon = document.createElement('i');
+                mainIcon.className = `fas ${categoryData.icons[Math.floor(Math.random() * categoryData.icons.length)]}`;
+                div.appendChild(mainIcon);
+
+                const bgIcon = document.createElement('i');
+                bgIcon.className = `fas ${categoryData.bgIcon} background-icon`;
+                div.appendChild(bgIcon);
+
+                const label = document.createElement('div');
+                label.className = 'category-label';
+                label.textContent = category;
+                div.appendChild(label);
             }
-
-            // Get category and color scheme
-            const category = getNewsCategory(title, description);
-            const colors = getColorSchemeForCategory(category);
-            const mainColor = colors[Math.floor(Math.random() * colors.length)];
             
-            // Get a meaningful word from the title
-            const keyword = getRandomWord(title) || category.toUpperCase();
-            
-            // Create different layout styles
-            const layouts = [
-                // Standard text
-                `https://via.placeholder.com/80/${mainColor}/FFFFFF?text=${encodeURIComponent(keyword)}`,
-                
-                // Split design (two-tone)
-                `https://via.placeholder.com/80/${mainColor}/FFFFFF/000000?text=${encodeURIComponent(keyword)}`,
-                
-                // Gradient suggestion through strips
-                `https://via.placeholder.com/80/${mainColor}/FFFFFF/FFFFFF?text=${encodeURIComponent(keyword)}`,
-                
-                // Category indicator
-                `https://via.placeholder.com/80/${mainColor}/FFFFFF?text=${encodeURIComponent(category.substring(0,2).toUpperCase() + '\n' + keyword)}`
-            ];
-
-            // Pick a random layout
-            return layouts[Math.floor(Math.random() * layouts.length)];
+            return div;
         }
 
         async function tryFetchWithProxy(rssUrl, proxyUrl) {
@@ -236,11 +307,7 @@
                 description = description.replace(/<[^>]*>/g, '');
                 description = description.trim().substring(0, 150) + '...';
 
-                const img = document.createElement('img');
-                img.src = getImageForNews(title, description, link);
-                img.onerror = () => {
-                    img.src = `https://via.placeholder.com/80/FB8807/FFFFFF?text=SF`;
-                };
+                const thumbnail = createThumbnail(title, description, link);
 
                 const newsItem = document.createElement('div');
                 newsItem.className = 'newsItem';
@@ -253,7 +320,7 @@
                     <div class="newsSummary">${description}</div>
                 `;
 
-                newsItem.appendChild(img);
+                newsItem.appendChild(thumbnail);
                 newsItem.appendChild(contentDiv);
                 newsList.appendChild(newsItem);
             }
