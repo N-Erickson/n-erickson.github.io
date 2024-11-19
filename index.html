@@ -5,6 +5,10 @@
     <meta http-equiv="refresh" content="300">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        @font-face {
+            font-family: 'Star 4 Radar';
+            src: url('fonts/Star 4 Radar.ttf');
+        }
         body {
             margin: 0;
             padding: 0;
@@ -28,7 +32,7 @@
             text-align: center;
             font-size: 24px;
             line-height: 26px;
-            font-weight: bold;
+            font-family: 'Star 4 Radar', Arial, sans-serif;
         }
         #reminderContent {
             width: 100%;
@@ -68,11 +72,6 @@
         .icon-thumbnail:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 12px rgba(0,0,0,0.3);
-        }
-        .icon-thumbnail img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
         }
         .icon-thumbnail i {
             font-size: 32px;
@@ -126,15 +125,11 @@
             flex: 1;
         }
         .source-thumbnail {
+            font-family: 'Star 4 Radar', Arial, sans-serif;
+            font-size: 20px;
             font-weight: bold;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
             background: linear-gradient(135deg, #FB8807, #FFB74D);
-        }
-        .source-label {
-            font-size: 12px;
-            color: #FB8807;
-            margin-top: 4px;
-            text-transform: uppercase;
         }
     </style>
 </head>
@@ -148,9 +143,15 @@
             <div id="newsList"></div>
         </div>
     </div>
-
     <script>
-const NEWS_CATEGORIES = {
+        const PROXY_URLS = [
+            'https://api.allorigins.win/raw?url=',
+            'https://api.rss2json.com/v1/api.json?rss_url=',
+            'https://api.allorigins.win/get?url=',
+            'https://api.codetabs.com/v1/proxy?quest='
+        ];
+
+        const NEWS_CATEGORIES = {
             weather: {
                 keywords: ['weather', 'storm', 'forecast', 'temperature', 'snow', 'rain', 'climate'],
                 mainIcon: 'fa-cloud-sun',
@@ -191,48 +192,98 @@ const NEWS_CATEGORIES = {
 
         const LOCAL_NEWS_SOURCES = [
             {
-                name: 'KELOLAND',
-                urls: [
-                    'https://www.keloland.com/feed/',
-                    'https://www.keloland.com/news/local-news/feed/'
-                ],
+                name: 'KELO',
                 shortName: 'KELO',
                 icon: 'fa-tv'
             },
             {
-                name: 'Dakota News Now',
-                urls: [
-                    'https://www.dakotanewsnow.com/feed/',
-                    'https://www.dakotanewsnow.com/news/feed/'
-                ],
-                shortName: 'DAKOTA',
-                icon: 'fa-broadcast-tower'
-            },
-            {
-                name: 'Sioux Falls Live',
-                urls: ['https://www.siouxfallslive.com/index.rss'],
-                shortName: 'SFL',
+                name: 'Argus Leader',
+                shortName: 'ARGUS',
                 icon: 'fa-newspaper'
             },
             {
-                name: 'SD News Watch',
-                urls: ['https://www.sdnewswatch.org/rss/'],
-                shortName: 'SDNW',
-                icon: 'fa-binoculars'
+                name: 'Dakota News',
+                shortName: 'DAKOTA',
+                icon: 'fa-radio'
             },
             {
-                name: 'Downtown SF',
-                urls: ['https://dtsf.com/blog/feed/'],
-                shortName: 'DTSF',
-                icon: 'fa-city'
-            },
-            {
-                name: 'SF Simplified',
-                urls: ['https://www.sfsimplified.com/rss/'],
-                shortName: 'SFS',
-                icon: 'fa-file-alt'
+                name: 'KSFY',
+                shortName: 'KSFY',
+                icon: 'fa-broadcast-tower'
             }
         ];
+
+        let failedProxies = new Set();
+        let currentProxyIndex = 0;
+
+        function getNextProxy() {
+            let attempts = 0;
+            while (attempts < PROXY_URLS.length) {
+                currentProxyIndex = (currentProxyIndex + 1) % PROXY_URLS.length;
+                const proxy = PROXY_URLS[currentProxyIndex];
+                if (!failedProxies.has(proxy)) {
+                    return proxy;
+                }
+                attempts++;
+            }
+            failedProxies.clear();
+            return PROXY_URLS[0];
+        }
+
+        function isValidXML(xmlString) {
+            try {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+                const parserErrors = xmlDoc.getElementsByTagName('parsererror');
+                return parserErrors.length === 0;
+            } catch (error) {
+                return false;
+            }
+        }
+
+        async function tryFetchWithProxy(rssUrl, proxyUrl) {
+            try {
+                console.log(`Attempting fetch with proxy: ${proxyUrl}`);
+                const response = await fetch(proxyUrl + encodeURIComponent(rssUrl));
+                if (!response.ok) {
+                    failedProxies.add(proxyUrl);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.text();
+                
+                if (proxyUrl.includes('rss2json')) {
+                    const jsonData = JSON.parse(data);
+                    if (jsonData.status === 'ok') {
+                        return `<?xml version="1.0" encoding="UTF-8"?>
+                        <rss version="2.0">
+                            <channel>
+                                ${jsonData.items.map(item => `
+                                    <item>
+                                        <title>${item.title}</title>
+                                        <link>${item.link}</link>
+                                        <description>${item.description}</description>
+                                        <pubDate>${item.pubDate}</pubDate>
+                                    </item>
+                                `).join('')}
+                            </channel>
+                        </rss>`;
+                    }
+                } else if (proxyUrl.includes('allorigins.win/get')) {
+                    const jsonData = JSON.parse(data);
+                    return jsonData.contents;
+                } else {
+                    return data;
+                }
+                
+                failedProxies.delete(proxyUrl);
+                return null;
+            } catch (error) {
+                console.error(`Error with proxy ${proxyUrl}:`, error);
+                failedProxies.add(proxyUrl);
+                return null;
+            }
+        }
 
         function getColorSchemeForCategory(category) {
             const schemes = {
@@ -256,139 +307,131 @@ const NEWS_CATEGORIES = {
             return 'general';
         }
 
-        function findThumbnail(item) {
-            // Try to find image in media:content
-            const mediaContent = item.getElementsByTagName('media:content')[0];
-            if (mediaContent && mediaContent.getAttribute('url')) {
-                return mediaContent.getAttribute('url');
-            }
-
-            // Try to find image in enclosure
-            const enclosure = item.getElementsByTagName('enclosure')[0];
-            if (enclosure && enclosure.getAttribute('url') && enclosure.getAttribute('type')?.startsWith('image/')) {
-                return enclosure.getAttribute('url');
-            }
-
-            // Try to find image in description
-            const description = item.getElementsByTagName('description')[0]?.textContent || '';
-            const imgMatch = description.match(/<img[^>]+src="([^">]+)"/);
-            if (imgMatch) {
-                return imgMatch[1];
-            }
-
-            return null;
-        }
-
-        function createThumbnail(title, description, link, imageUrl, source) {
+        function createThumbnail(title, description, link) {
+            const sourceMatch = LOCAL_NEWS_SOURCES.find(source => 
+                link.toLowerCase().includes(source.name.toLowerCase())
+            );
+            
             const div = document.createElement('div');
             div.className = 'icon-thumbnail';
             
-            if (imageUrl) {
-                const img = document.createElement('img');
-                img.src = imageUrl;
-                img.alt = title;
-                img.onerror = function() {
-                    // If image fails to load, fallback to source icon
-                    div.innerHTML = '';
-                    div.classList.add('source-thumbnail');
-                    const icon = document.createElement('i');
-                    icon.className = `fas ${source.icon}`;
-                    div.appendChild(icon);
-                    const label = document.createElement('div');
-                    label.className = 'category-label';
-                    label.textContent = source.shortName;
-                    div.appendChild(label);
-                };
-                div.appendChild(img);
-            } else {
+            if (sourceMatch) {
                 div.classList.add('source-thumbnail');
                 const icon = document.createElement('i');
-                icon.className = `fas ${source.icon}`;
+                icon.className = `fas ${sourceMatch.icon}`;
                 div.appendChild(icon);
                 const label = document.createElement('div');
                 label.className = 'category-label';
-                label.textContent = source.shortName;
+                label.textContent = sourceMatch.shortName;
+                div.appendChild(label);
+            } else {
+                const category = getNewsCategory(title, description);
+                const categoryData = NEWS_CATEGORIES[category] || {
+                    mainIcon: 'fa-newspaper',
+                    bgIcon: 'fa-circle',
+                    icons: ['fa-newspaper']
+                };
+                
+                const colors = getColorSchemeForCategory(category);
+                const mainColor = colors[Math.floor(Math.random() * colors.length)];
+                div.style.backgroundColor = `#${mainColor}`;
+
+                const mainIcon = document.createElement('i');
+                mainIcon.className = `fas ${categoryData.icons[Math.floor(Math.random() * categoryData.icons.length)]}`;
+                div.appendChild(mainIcon);
+
+                const bgIcon = document.createElement('i');
+                bgIcon.className = `fas ${categoryData.bgIcon} background-icon`;
+                div.appendChild(bgIcon);
+
+                const label = document.createElement('div');
+                label.className = 'category-label';
+                label.textContent = category;
                 div.appendChild(label);
             }
             
             return div;
         }
 
-        async function fetchNews() {
+        async function processNewsItems(xmlDoc) {
+            const items = xmlDoc.getElementsByTagName('item');
             const newsList = document.getElementById('newsList');
-            const errorMessage = document.getElementById('errorMessage');
-            let allNews = [];
-            
-            for (const source of LOCAL_NEWS_SOURCES) {
-                for (const url of source.urls) {
-                    try {
-                        const response = await fetch(url);
-                        if (!response.ok) continue;
-                        
-                        const data = await response.text();
-                        const parser = new DOMParser();
-                        const xmlDoc = parser.parseFromString(data, "text/xml");
-                        
-                        if (xmlDoc.getElementsByTagName('parsererror').length) continue;
-                        
-                        const items = xmlDoc.getElementsByTagName('item');
-                        for (let i = 0; i < Math.min(items.length, 5); i++) {
-                            const item = items[i];
-                            const imageUrl = findThumbnail(item);
-                            const pubDate = new Date(item.getElementsByTagName('pubDate')[0]?.textContent || Date.now());
-                            
-                            allNews.push({
-                                title: item.getElementsByTagName('title')[0]?.textContent || 'No Title',
-                                link: item.getElementsByTagName('link')[0]?.textContent || '#',
-                                description: (item.getElementsByTagName('description')[0]?.textContent || '')
-                                    .replace(/<[^>]*>/g, '')
-                                    .trim()
-                                    .substring(0, 150) + '...',
-                                imageUrl: imageUrl,
-                                source: source,
-                                pubDate: pubDate
-                            });
-                        }
-                    } catch (error) {
-                        console.error(`Error fetching from ${source.name}:`, error);
-                    }
-                }
-            }
-            
-            if (allNews.length === 0) {
-                errorMessage.style.display = 'block';
-                errorMessage.textContent = 'Unable to load news. Please try again later.';
-                return;
-            }
-            
-            // Sort by newest first
-            allNews.sort((a, b) => b.pubDate - a.pubDate);
-            // Limit to 10 items
-            allNews = allNews.slice(0, 10);
-            
             newsList.innerHTML = '';
-            allNews.forEach(item => {
-                const thumbnail = createThumbnail(item.title, item.description, item.link, item.imageUrl, item.source);
-                
+
+            for (let i = 0; i < Math.min(items.length, 50); i++) {
+                const item = items[i];
+                const title = item.getElementsByTagName('title')[0]?.textContent || 'No Title';
+                const link = item.getElementsByTagName('link')[0]?.textContent || '#';
+                let description = item.getElementsByTagName('description')[0]?.textContent || '';
+
+                description = description.replace(/<[^>]*>/g, '');
+                description = description.trim().substring(0, 150) + '...';
+
+                const thumbnail = createThumbnail(title, description, link);
+
                 const newsItem = document.createElement('div');
                 newsItem.className = 'newsItem';
-                
+
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'newsContent';
                 
                 contentDiv.innerHTML = `
-                    <a href="${item.link}" target="_blank">${item.title}</a>
-                    <div class="newsSummary">${item.description}</div>
-                    <div class="source-label">${item.source.name}</div>
+                    <a href="${link}" target="_blank">${title}</a>
+                    <div class="newsSummary">${description}</div>
                 `;
-                
+
                 newsItem.appendChild(thumbnail);
                 newsItem.appendChild(contentDiv);
                 newsList.appendChild(newsItem);
-            });
+            }
+        }
+
+        async function fetchNews() {
+            const rssUrl = 'https://news.google.com/rss/search?q=location:Sioux+Falls+when:7d&hl=en-US&gl=US&ceid=US:en';
+            const errorMessage = document.getElementById('errorMessage');
             
-            errorMessage.style.display = 'none';
-            startScrolling();
+            let success = false;
+            let attemptsRemaining = PROXY_URLS.length * 2;
+            
+            while (!success && attemptsRemaining > 0) {
+                const proxyUrl = getNextProxy();
+                console.log(`Trying proxy: ${proxyUrl}`);
+                
+                try {
+                    const data = await tryFetchWithProxy(rssUrl, proxyUrl);
+                    
+                    if (data && isValidXML(data)) {
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(data, "text/xml");
+                        
+                        if (!xmlDoc.getElementsByTagName('parsererror').length) {
+                            await processNewsItems(xmlDoc);
+                            success = true;
+                            console.log(`Success with proxy: ${proxyUrl}`);
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error processing data from ${proxyUrl}:`, error);
+                }
+                
+                attemptsRemaining--;
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+
+            if (!success) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = 'Unable to load news. Please try again later.';
+                console.error('All proxies failed');
+            } else {
+                errorMessage.style.display = 'none';
+                startScrolling();
+            }
+
+            // Reset failed proxies list periodically
+            setTimeout(() => {
+                failedProxies.clear();
+            }, 300000);
         }
 
         function startScrolling() {
