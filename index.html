@@ -8,6 +8,10 @@
             font-family: 'Star 4 Radar';
             src: url('fonts/Star 4 Radar.ttf');
         }
+        body {
+            margin: 0;
+            padding: 0;
+        }
         #reminderContainer {
             width: 400px;
             height: 900px;
@@ -17,7 +21,7 @@
             left: 0;
             overflow: hidden;
             color: white;
-            font-family: Arial, sans-serif; /* Fallback font if Star 4 Radar isn't available */
+            font-family: Arial, sans-serif;
             box-shadow: 0px 0px 20px #FB8807;
         }
         #reminderHeader {
@@ -56,6 +60,7 @@
             object-fit: cover;
             border: 2px solid #FB8807;
             border-radius: 4px;
+            background: #0d4270;
         }
         .newsItem a {
             color: #FB8807;
@@ -102,6 +107,109 @@
             'https://api.rss2json.com/v1/api.json?rss_url='
         ];
 
+        const NEWS_CATEGORIES = {
+            weather: ['weather', 'storm', 'forecast', 'temperature', 'snow', 'rain', 'climate'],
+            sports: ['sports', 'football', 'basketball', 'baseball', 'tournament', 'game', 'score', 'team', 'playoff'],
+            business: ['business', 'economy', 'market', 'company', 'store', 'restaurant', 'financial', 'money', 'bank'],
+            politics: ['government', 'mayor', 'council', 'vote', 'election', 'policy', 'senator', 'republican', 'democrat'],
+            crime: ['police', 'crime', 'arrest', 'investigation', 'court', 'law', 'sheriff', 'robbery', 'suspect'],
+            community: ['community', 'event', 'festival', 'parade', 'celebration', 'school', 'local', 'neighborhood'],
+            entertainment: ['movie', 'concert', 'music', 'theater', 'show', 'performance', 'art', 'museum'],
+            health: ['health', 'medical', 'hospital', 'doctor', 'clinic', 'virus', 'disease', 'treatment'],
+            education: ['education', 'school', 'university', 'student', 'teacher', 'class', 'academic'],
+            development: ['construction', 'building', 'development', 'project', 'property', 'real estate']
+        };
+
+        const LOCAL_NEWS_SOURCES = [
+            {
+                name: 'KELO',
+                shortName: 'KELO'
+            },
+            {
+                name: 'Argus Leader',
+                shortName: 'ARGUS'
+            },
+            {
+                name: 'Dakota News',
+                shortName: 'DAKOTA'
+            },
+            {
+                name: 'KSFY',
+                shortName: 'KSFY'
+            }
+        ];
+
+        function getColorSchemeForCategory(category) {
+            const schemes = {
+                weather: ['87CEEB', '4682B4', '1E90FF'],      // Sky blues
+                sports: ['FF6B6B', 'FF8E8E', 'FFB4B4'],       // Energetic reds
+                business: ['4CAF50', '66BB6A', '81C784'],     // Professional greens
+                politics: ['9C27B0', 'BA68C8', 'CE93D8'],     // Royal purples
+                crime: ['F44336', 'EF5350', 'E57373'],        // Alert reds
+                community: ['FF9800', 'FFA726', 'FFB74D'],    // Warm oranges
+                entertainment: ['E91E63', 'EC407A', 'F06292'], // Vibrant pinks
+                health: ['00BCD4', '26C6DA', '4DD0E1'],       // Medical blues
+                education: ['3F51B5', '5C6BC0', '7986CB'],    // Academic blues
+                development: ['795548', '8D6E63', 'A1887F']   // Earth browns
+            };
+            
+            return schemes[category] || ['FB8807', 'FFA647', 'FFC487']; // Default orange scheme
+        }
+
+        function getRandomWord(text, minLength = 4) {
+            const words = text.split(' ')
+                .filter(word => word.length >= minLength)
+                .filter(word => !word.toLowerCase().includes('sioux') && !word.toLowerCase().includes('falls'));
+            return words[Math.floor(Math.random() * words.length)] || 'SF';
+        }
+
+        function getNewsCategory(title, description) {
+            const content = (title + ' ' + description).toLowerCase();
+            for (const [category, keywords] of Object.entries(NEWS_CATEGORIES)) {
+                if (keywords.some(keyword => content.includes(keyword))) {
+                    return category;
+                }
+            }
+            return 'general';
+        }
+
+        function getImageForNews(title, description, link) {
+            // Try to match to a local news source first
+            const sourceMatch = LOCAL_NEWS_SOURCES.find(source => 
+                link.toLowerCase().includes(source.name.toLowerCase())
+            );
+            
+            if (sourceMatch) {
+                return `https://via.placeholder.com/80/FB8807/FFFFFF?text=${encodeURIComponent(sourceMatch.shortName)}`;
+            }
+
+            // Get category and color scheme
+            const category = getNewsCategory(title, description);
+            const colors = getColorSchemeForCategory(category);
+            const mainColor = colors[Math.floor(Math.random() * colors.length)];
+            
+            // Get a meaningful word from the title
+            const keyword = getRandomWord(title) || category.toUpperCase();
+            
+            // Create different layout styles
+            const layouts = [
+                // Standard text
+                `https://via.placeholder.com/80/${mainColor}/FFFFFF?text=${encodeURIComponent(keyword)}`,
+                
+                // Split design (two-tone)
+                `https://via.placeholder.com/80/${mainColor}/FFFFFF/000000?text=${encodeURIComponent(keyword)}`,
+                
+                // Gradient suggestion through strips
+                `https://via.placeholder.com/80/${mainColor}/FFFFFF/FFFFFF?text=${encodeURIComponent(keyword)}`,
+                
+                // Category indicator
+                `https://via.placeholder.com/80/${mainColor}/FFFFFF?text=${encodeURIComponent(category.substring(0,2).toUpperCase() + '\n' + keyword)}`
+            ];
+
+            // Pick a random layout
+            return layouts[Math.floor(Math.random() * layouts.length)];
+        }
+
         async function tryFetchWithProxy(rssUrl, proxyUrl) {
             try {
                 const response = await fetch(proxyUrl + encodeURIComponent(rssUrl));
@@ -111,6 +219,43 @@
             } catch (error) {
                 console.error(`Error with proxy ${proxyUrl}:`, error);
                 return null;
+            }
+        }
+
+        async function processNewsItems(xmlDoc) {
+            const items = xmlDoc.getElementsByTagName('item');
+            const newsList = document.getElementById('newsList');
+            newsList.innerHTML = '';
+
+            for (let i = 0; i < Math.min(items.length, 10); i++) {
+                const item = items[i];
+                const title = item.getElementsByTagName('title')[0]?.textContent || 'No Title';
+                const link = item.getElementsByTagName('link')[0]?.textContent || '#';
+                let description = item.getElementsByTagName('description')[0]?.textContent || '';
+
+                description = description.replace(/<[^>]*>/g, '');
+                description = description.trim().substring(0, 150) + '...';
+
+                const img = document.createElement('img');
+                img.src = getImageForNews(title, description, link);
+                img.onerror = () => {
+                    img.src = `https://via.placeholder.com/80/FB8807/FFFFFF?text=SF`;
+                };
+
+                const newsItem = document.createElement('div');
+                newsItem.className = 'newsItem';
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'newsContent';
+                
+                contentDiv.innerHTML = `
+                    <a href="${link}" target="_blank">${title}</a>
+                    <div class="newsSummary">${description}</div>
+                `;
+
+                newsItem.appendChild(img);
+                newsItem.appendChild(contentDiv);
+                newsList.appendChild(newsItem);
             }
         }
 
@@ -148,45 +293,6 @@
             }
         }
 
-        async function processNewsItems(xmlDoc) {
-            const items = xmlDoc.getElementsByTagName('item');
-            const newsList = document.getElementById('newsList');
-            newsList.innerHTML = ''; // Clear existing items
-
-            for (let i = 0; i < Math.min(items.length, 10); i++) {
-                const item = items[i];
-                const newsItem = document.createElement('div');
-                newsItem.className = 'newsItem';
-
-                const title = item.getElementsByTagName('title')[0]?.textContent || 'No Title';
-                const link = item.getElementsByTagName('link')[0]?.textContent || '#';
-                let description = item.getElementsByTagName('description')[0]?.textContent || '';
-
-                // Clean up description
-                description = description.replace(/<[^>]*>/g, '');
-                description = description.trim().substring(0, 150) + '...';
-
-                // Create image with fallback
-                const img = document.createElement('img');
-                img.src = 'https://via.placeholder.com/80/FB8807/FFFFFF?text=SF+News';
-                img.onerror = () => img.src = 'https://via.placeholder.com/80/FB8807/FFFFFF?text=SF+News';
-
-                // Create content wrapper
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'newsContent';
-
-                // Add title and description
-                contentDiv.innerHTML = `
-                    <a href="${link}" target="_blank">${title}</a>
-                    <div class="newsSummary">${description}</div>
-                `;
-
-                newsItem.appendChild(img);
-                newsItem.appendChild(contentDiv);
-                newsList.appendChild(newsItem);
-            }
-        }
-
         function startScrolling() {
             const newsList = document.getElementById('newsList');
             const container = document.getElementById('reminderContent');
@@ -194,7 +300,6 @@
             const scrollSpeed = 1;
             let isPaused = false;
 
-            // Add pause on hover
             container.addEventListener('mouseenter', () => isPaused = true);
             container.addEventListener('mouseleave', () => isPaused = false);
 
@@ -204,7 +309,6 @@
                     const maxScroll = newsList.scrollHeight - container.clientHeight;
                     
                     if (scrollPosition >= maxScroll) {
-                        // Smooth reset to top
                         scrollPosition = 0;
                     }
                     
