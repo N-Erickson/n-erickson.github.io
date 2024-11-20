@@ -183,7 +183,7 @@
                 icons: ['fa-landmark', 'fa-gavel', 'fa-scale-balanced', 'fa-flag', 'fa-handshake', 'fa-scroll']
             },
             crime: {
-                keywords: ['police', 'crime', 'arrest', 'investigation', 'court', 'law', 'sheriff'],
+                keywords: ['police', 'crime', 'arrest', 'investigation', 'court', 'law', 'sheriff', 'homicide'],
                 mainIcon: 'fa-shield',
                 bgIcon: 'fa-balance-scale',
                 icons: ['fa-shield', 'fa-user-shield', 'fa-gavel', 'fa-bell', 'fa-exclamation-triangle']
@@ -222,29 +222,78 @@
         let failedProxies = new Set();
         let currentProxyIndex = 0;
 
-        function getNextProxy() {
-            let attempts = 0;
-            while (attempts < PROXY_URLS.length) {
-                currentProxyIndex = (currentProxyIndex + 1) % PROXY_URLS.length;
-                const proxy = PROXY_URLS[currentProxyIndex];
-                if (!failedProxies.has(proxy)) {
-                    return proxy;
-                }
-                attempts++;
-            }
-            failedProxies.clear();
-            return PROXY_URLS[0];
+        function extractSourceFromDescription(description) {
+            const match = description.match(/<font color="#6f6f6f">(.*?)<\/font>/);
+            return match ? match[1].trim() : 'Unknown Source';
         }
 
-        function isValidXML(xmlString) {
-            try {
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(xmlString, "text/xml");
-                const parserErrors = xmlDoc.getElementsByTagName('parsererror');
-                return parserErrors.length === 0;
-            } catch (error) {
-                return false;
+        function getNewsCategory(title, description) {
+            const content = (title + ' ' + description).toLowerCase();
+            for (const [category, data] of Object.entries(NEWS_CATEGORIES)) {
+                if (data.keywords.some(keyword => content.includes(keyword))) {
+                    return category;
+                }
             }
+            return 'general';
+        }
+
+        function createThumbnail(title, description, source) {
+    const div = document.createElement('div');
+    div.className = 'icon-thumbnail';
+    
+    const sourceMatch = LOCAL_NEWS_SOURCES.find(s => 
+        source.toLowerCase().includes(s.name.toLowerCase())
+    );
+    
+    if (sourceMatch) {
+        div.classList.add('source-thumbnail');
+        const icon = document.createElement('i');
+        icon.className = `fas ${sourceMatch.icon}`;
+        div.appendChild(icon);
+        const label = document.createElement('div');
+        label.className = 'category-label';
+        label.textContent = sourceMatch.shortName;
+        div.appendChild(label);
+    } else {
+        const category = getNewsCategory(title, description);
+        const categoryData = NEWS_CATEGORIES[category] || {
+            mainIcon: 'fa-newspaper',
+            bgIcon: 'fa-circle',
+            icons: ['fa-newspaper']
+        };
+        
+        const colors = getColorSchemeForCategory(category);
+        const mainColor = colors[Math.floor(Math.random() * colors.length)];
+        div.style.backgroundColor = `#${mainColor}`;
+
+        const mainIcon = document.createElement('i');
+        mainIcon.className = `fas ${categoryData.icons[Math.floor(Math.random() * categoryData.icons.length)]}`;
+        div.appendChild(mainIcon);
+
+        const bgIcon = document.createElement('i');
+        bgIcon.className = `fas ${categoryData.bgIcon} background-icon`;
+        div.appendChild(bgIcon);
+
+        const label = document.createElement('div');
+        label.className = 'category-label';
+        // Changed this line to always show category instead of source
+        label.textContent = category.toUpperCase();
+        div.appendChild(label);
+    }
+    
+    return div;
+}
+
+        function getColorSchemeForCategory(category) {
+            const schemes = {
+                weather: ['87CEEB', '4682B4', '1E90FF'],
+                sports: ['FF6B6B', 'FF8E8E', 'FFB4B4'],
+                business: ['4CAF50', '66BB6A', '81C784'],
+                politics: ['9C27B0', 'BA68C8', 'CE93D8'],
+                crime: ['F44336', 'EF5350', 'E57373'],
+                community: ['FF9800', 'FFA726', 'FFB74D']
+            };
+            return schemes[category] || ['FB8807', 'FFA647', 'FFC487'];
         }
 
         async function tryFetchWithProxy(rssUrl, proxyUrl) {
@@ -261,19 +310,8 @@
                 if (proxyUrl.includes('rss2json')) {
                     const jsonData = JSON.parse(data);
                     if (jsonData.status === 'ok') {
-                        return `<?xml version="1.0" encoding="UTF-8"?>
-                        <rss version="2.0">
-                            <channel>
-                                ${jsonData.items.map(item => `
-                                    <item>
-                                        <title>${item.title}</title>
-                                        <link>${item.link}</link>
-                                        <description>${item.description}</description>
-                                        <pubDate>${item.pubDate}</pubDate>
-                                    </item>
-                                `).join('')}
-                            </channel>
-                        </rss>`;
+                        console.log(`RSS2JSON returned ${jsonData.items.length} items`);
+                        return jsonData.items;
                     }
                 } else if (proxyUrl.includes('allorigins.win/get')) {
                     const jsonData = JSON.parse(data);
@@ -291,72 +329,18 @@
             }
         }
 
-        function getColorSchemeForCategory(category) {
-            const schemes = {
-                weather: ['87CEEB', '4682B4', '1E90FF'],
-                sports: ['FF6B6B', 'FF8E8E', 'FFB4B4'],
-                business: ['4CAF50', '66BB6A', '81C784'],
-                politics: ['9C27B0', 'BA68C8', 'CE93D8'],
-                crime: ['F44336', 'EF5350', 'E57373'],
-                community: ['FF9800', 'FFA726', 'FFB74D']
-            };
-            return schemes[category] || ['FB8807', 'FFA647', 'FFC487'];
-        }
-
-        function getNewsCategory(title, description) {
-            const content = (title + ' ' + description).toLowerCase();
-            for (const [category, data] of Object.entries(NEWS_CATEGORIES)) {
-                if (data.keywords.some(keyword => content.includes(keyword))) {
-                    return category;
+        function getNextProxy() {
+            let attempts = 0;
+            while (attempts < PROXY_URLS.length) {
+                currentProxyIndex = (currentProxyIndex + 1) % PROXY_URLS.length;
+                const proxy = PROXY_URLS[currentProxyIndex];
+                if (!failedProxies.has(proxy)) {
+                    return proxy;
                 }
+                attempts++;
             }
-            return 'general';
-        }
-
-        function createThumbnail(title, description, link) {
-            const sourceMatch = LOCAL_NEWS_SOURCES.find(source => 
-                link.toLowerCase().includes(source.name.toLowerCase())
-            );
-            
-            const div = document.createElement('div');
-            div.className = 'icon-thumbnail';
-            
-            if (sourceMatch) {
-                div.classList.add('source-thumbnail');
-                const icon = document.createElement('i');
-                icon.className = `fas ${sourceMatch.icon}`;
-                div.appendChild(icon);
-                const label = document.createElement('div');
-                label.className = 'category-label';
-                label.textContent = sourceMatch.shortName;
-                div.appendChild(label);
-            } else {
-                const category = getNewsCategory(title, description);
-                const categoryData = NEWS_CATEGORIES[category] || {
-                    mainIcon: 'fa-newspaper',
-                    bgIcon: 'fa-circle',
-                    icons: ['fa-newspaper']
-                };
-                
-                const colors = getColorSchemeForCategory(category);
-                const mainColor = colors[Math.floor(Math.random() * colors.length)];
-                div.style.backgroundColor = `#${mainColor}`;
-
-                const mainIcon = document.createElement('i');
-                mainIcon.className = `fas ${categoryData.icons[Math.floor(Math.random() * categoryData.icons.length)]}`;
-                div.appendChild(mainIcon);
-
-                const bgIcon = document.createElement('i');
-                bgIcon.className = `fas ${categoryData.bgIcon} background-icon`;
-                div.appendChild(bgIcon);
-
-                const label = document.createElement('div');
-                label.className = 'category-label';
-                label.textContent = category;
-                div.appendChild(label);
-            }
-            
-            return div;
+            failedProxies.clear();
+            return PROXY_URLS[0];
         }
 
         async function processNewsItems(xmlDoc) {
@@ -364,46 +348,66 @@
             const newsList = document.getElementById('newsList');
             newsList.innerHTML = '';
 
+            console.log(`Found ${items.length} total items`);
+
             // Sort items by pubDate
             items.sort((a, b) => {
-                const dateA = new Date(a.getElementsByTagName('pubDate')[0]?.textContent);
-                const dateB = new Date(b.getElementsByTagName('pubDate')[0]?.textContent);
+                const dateA = new Date(a.getElementsByTagName('pubDate')[0]?.textContent || '');
+                const dateB = new Date(b.getElementsByTagName('pubDate')[0]?.textContent || '');
                 return dateB - dateA; // Most recent first
             });
 
-            for (let i = 0; i < Math.min(items.length, 50); i++) {
-                const item = items[i];
+            // Process every item
+            items.forEach((item, index) => {
                 const title = item.getElementsByTagName('title')[0]?.textContent || 'No Title';
                 const link = item.getElementsByTagName('link')[0]?.textContent || '#';
-                let description = item.getElementsByTagName('description')[0]?.textContent || '';
+                const description = item.getElementsByTagName('description')[0]?.textContent || '';
                 const pubDate = new Date(item.getElementsByTagName('pubDate')[0]?.textContent);
+                
+                // Extract source from description
+                const source = extractSourceFromDescription(description);
+                
+                console.log(`Processing item ${index + 1}: ${title} - ${source} - ${pubDate.toISOString()}`);
 
-                description = description.replace(/<[^>]*>/g, '');
-                description = description.trim().substring(0, 150) + '...';
+                const cleanDescription = description
+                    .replace(/<[^>]*>/g, '')
+                    .replace(/&nbsp;/g, ' ')
+                    .trim()
+                    .substring(0, 150) + '...';
 
-                const thumbnail = createThumbnail(title, description, link);
                 const newsItem = document.createElement('div');
                 newsItem.className = 'newsItem';
-
+                
+                const thumbnail = createThumbnail(title, cleanDescription, source);
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'newsContent';
                 
+                const formattedDate = pubDate.toLocaleString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZoneName: 'short'
+                });
+
                 contentDiv.innerHTML = `
                     <a href="${link}" target="_blank">${title}</a>
-                    <div class="newsSummary">${description}</div>
-                    <div class="newsDate">${pubDate.toLocaleString()}</div>
+                    <div class="newsSummary">${cleanDescription}</div>
+                    <div class="newsDate">${formattedDate}</div>
                 `;
 
                 newsItem.appendChild(thumbnail);
                 newsItem.appendChild(contentDiv);
                 newsList.appendChild(newsItem);
-            }
+            });
         }
 
         async function fetchNews() {
-            const rssUrl = 'https://news.google.com/rss/search?q=location:Sioux+Falls+when:2d&hl=en-US&gl=US&ceid=US:en';
+            const rssUrl = 'https://news.google.com/rss/search?q=location:Sioux+Falls+when:3d&hl=en-US&gl=US&ceid=US:en&num=100';
             const errorMessage = document.getElementById('errorMessage');
             
+            console.log('Starting fetch with URL:', rssUrl);
             let success = false;
             let attemptsRemaining = PROXY_URLS.length * 2;
             
@@ -414,7 +418,7 @@
                 try {
                     const data = await tryFetchWithProxy(rssUrl, proxyUrl);
                     
-                    if (data && isValidXML(data)) {
+                    if (data) {
                         const parser = new DOMParser();
                         const xmlDoc = parser.parseFromString(data, "text/xml");
                         
@@ -451,7 +455,7 @@
             const newsList = document.getElementById('newsList');
             const container = document.getElementById('reminderContent');
             let scrollPosition = 0;
-            const scrollSpeed = 0.5; // Slower scrolling speed
+            const scrollSpeed = 0.5;
             let isPaused = false;
 
             container.addEventListener('mouseenter', () => isPaused = true);
